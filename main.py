@@ -35,7 +35,7 @@ def register_methods(cache):
              output_filename_sans_extension, gpu_id, session_id) = parse_inputs()
             link_model_path(character)
             execute_program(user_text, character, noise, style_blend, diffusion_steps, embedding_scale, use_long_form,
-                            output_filename_sans_extension, gpu_id, session_id)
+                            output_filename_sans_extension, gpu_id)
             copy_output(output_filename_sans_extension, session_id)
             hsc.clean_up(get_temp_files())
         except BadInputException:
@@ -125,12 +125,12 @@ def register_methods(cache):
         arguments = [
             '--text', user_text,
             '--weights_path', os.path.join(WEIGHTS_FOLDER, character + WEIGHTS_FILE_EXTENSION),
-            '--output_filepath', os.path.join(OUTPUT_COPY_FOLDER, output_filename_sans_extension, TEMP_FILE_EXTENSION)
+            '--output_filepath', os.path.join(OUTPUT_COPY_FOLDER, output_filename_sans_extension + TEMP_FILE_EXTENSION),
             # Optional Parameters
-            *(['--noise', noise] if noise else [None, None]),
-            *(['--style_blend', style_blend] if style_blend else [None, None]),
-            *(['--diffusion_steps', diffusion_steps] if diffusion_steps else [None, None]),
-            *(['--embedding_scale', embedding_scale] if embedding_scale else [None, None]),
+            *(['--noise', str(noise)] if noise else [None, None]),
+            *(['--style_blend', str(style_blend)] if style_blend else [None, None]),
+            *(['--diffusion_steps', str(diffusion_steps)] if diffusion_steps else [None, None]),
+            *(['--embedding_scale', str(embedding_scale)] if embedding_scale else [None, None]),
             *(['--use_long_form'] if use_long_form else [None]),
         ]
         arguments = [argument for argument in arguments if argument]  # Removes all "None" objects in the list.
