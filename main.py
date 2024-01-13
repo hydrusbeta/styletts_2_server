@@ -21,7 +21,10 @@ PYTHON_EXECUTABLE = os.path.join(hsc.ROOT_DIR, '.venvs', ARCHITECTURE_NAME, 'bin
 INFERENCE_SCRIPT_PATH = os.path.join(ARCHITECTURE_ROOT, 'command_line_interface.py')
 
 WEIGHTS_FILE_EXTENSION = '.pth'
-CONFIG_FILE_EXTENSIONS = ('.yml', '.yaml')
+
+# todo: update get_single_file_with_extension in hay_say_common so I can just specify a tuple of possible extensions
+CONFIG_FILE_EXTENSION = '.yml'
+CONFIG_FILE_EXTENSION_ALT = '.yaml'
 
 app = Flask(__name__)
 
@@ -111,19 +114,28 @@ def register_methods(cache):
     class BadInputException(Exception):
         pass
 
+    def get_config_file(character):
+        character_dir = hsc.character_dir(ARCHITECTURE_NAME, character)
+        try:
+            config_file = hsc.get_single_file_with_extension(character_dir, CONFIG_FILE_EXTENSION)
+        except Exception:
+            config_file = hsc.get_single_file_with_extension(character_dir, CONFIG_FILE_EXTENSION_ALT)
+        return config_file
+
     def execute_program(user_text, character, noise, style_blend, diffusion_steps, embedding_scale, use_long_form,
                         output_filename_sans_extension, gpu_id):
         character_dir = hsc.character_dir(ARCHITECTURE_NAME, character)
+        config_file = get_config_file(character)
         arguments = [
             '--text', user_text,
             '--weights_file', hsc.get_single_file_with_extension(character_dir, WEIGHTS_FILE_EXTENSION),
-            '--config_file', hsc.get_single_file_with_extension(character_dir, CONFIG_FILE_EXTENSIONS),
+            '--config_file', config_file,
             '--output_filepath', os.path.join(OUTPUT_COPY_FOLDER, output_filename_sans_extension + TEMP_FILE_EXTENSION),
             # Optional Parameters
-            *(['--noise', str(noise)] if noise else [None, None]),
-            *(['--style_blend', str(style_blend)] if style_blend else [None, None]),
-            *(['--diffusion_steps', str(diffusion_steps)] if diffusion_steps else [None, None]),
-            *(['--embedding_scale', str(embedding_scale)] if embedding_scale else [None, None]),
+            *(['--noise', str(noise)] if noise is not None else [None, None]),
+            *(['--style_blend', str(style_blend)] if style_blend is not None else [None, None]),
+            *(['--diffusion_steps', str(diffusion_steps)] if diffusion_steps is not None else [None, None]),
+            *(['--embedding_scale', str(embedding_scale)] if embedding_scale is not None else [None, None]),
             *(['--use_long_form'] if use_long_form else [None]),
         ]
         arguments = [argument for argument in arguments if argument]  # Removes all "None" objects in the list.
