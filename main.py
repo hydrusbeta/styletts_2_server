@@ -21,6 +21,7 @@ PYTHON_EXECUTABLE = os.path.join(hsc.ROOT_DIR, '.venvs', ARCHITECTURE_NAME, 'bin
 INFERENCE_SCRIPT_PATH = os.path.join(ARCHITECTURE_ROOT, 'command_line_interface.py')
 
 WEIGHTS_FILE_EXTENSION = '.pth'
+CONFIG_FILE_EXTENSIONS = ('.yml', '.yaml')
 
 app = Flask(__name__)
 
@@ -33,7 +34,6 @@ def register_methods(cache):
         try:
             (user_text, character, noise, style_blend, diffusion_steps, embedding_scale, use_long_form,
              output_filename_sans_extension, gpu_id, session_id) = parse_inputs()
-            link_model_path(character)
             execute_program(user_text, character, noise, style_blend, diffusion_steps, embedding_scale, use_long_form,
                             output_filename_sans_extension, gpu_id)
             copy_output(output_filename_sans_extension, session_id)
@@ -111,20 +111,13 @@ def register_methods(cache):
     class BadInputException(Exception):
         pass
 
-
-    def link_model_path(character):
-        """Create a symbolic link to the model file in the location where RVC expects to find it."""
-        symlink_file = os.path.join(WEIGHTS_FOLDER, character + WEIGHTS_FILE_EXTENSION)
-        character_dir = hsc.character_dir(ARCHITECTURE_NAME, character)
-        weight_file = hsc.get_single_file_with_extension(character_dir, WEIGHTS_FILE_EXTENSION)
-        hsc.create_link(weight_file, symlink_file)
-
-
     def execute_program(user_text, character, noise, style_blend, diffusion_steps, embedding_scale, use_long_form,
                         output_filename_sans_extension, gpu_id):
+        character_dir = hsc.character_dir(ARCHITECTURE_NAME, character)
         arguments = [
             '--text', user_text,
-            '--weights_path', os.path.join(WEIGHTS_FOLDER, character + WEIGHTS_FILE_EXTENSION),
+            '--weights_file', hsc.get_single_file_with_extension(character_dir, WEIGHTS_FILE_EXTENSION),
+            '--config_file', hsc.get_single_file_with_extension(character_dir, CONFIG_FILE_EXTENSIONS),
             '--output_filepath', os.path.join(OUTPUT_COPY_FOLDER, output_filename_sans_extension + TEMP_FILE_EXTENSION),
             # Optional Parameters
             *(['--noise', str(noise)] if noise else [None, None]),
