@@ -74,7 +74,7 @@ def register_methods(cache):
                     'type': 'object',
                     'properties': {
                         'User Text': {'type': 'string'},
-                        'User Audio': {'type': 'string'}
+                        'User Audio': {'type': ['string', 'null']}
                     },
                     'required': ['User Text']
                 },
