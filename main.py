@@ -4,6 +4,7 @@ import json
 import os.path
 import subprocess
 import traceback
+import soundfile
 
 import hay_say_common as hsc
 import jsonschema
@@ -13,6 +14,7 @@ from jsonschema import ValidationError
 
 ARCHITECTURE_NAME = 'styletts_2'
 ARCHITECTURE_ROOT = os.path.join(hsc.ROOT_DIR, ARCHITECTURE_NAME)
+INPUT_COPY_FOLDER = os.path.join(ARCHITECTURE_ROOT, 'input')
 OUTPUT_COPY_FOLDER = os.path.join(ARCHITECTURE_ROOT, 'output')
 WEIGHTS_FOLDER = os.path.join(ARCHITECTURE_ROOT, 'Models', 'LJSpeech')
 TEMP_FILE_EXTENSION = '.wav'
@@ -36,8 +38,12 @@ def register_methods(cache):
         message = ""
         try:
             (user_text, character, noise, style_blend, diffusion_steps, embedding_scale, use_long_form,
+             input_hash, enable_reference_audio, timbre_ref_blend, prosody_ref_blend,
              output_filename_sans_extension, gpu_id, session_id) = parse_inputs()
+            reference_audio = prepare_reference_audio(input_hash, enable_reference_audio, cache,
+                                                      session_id)
             execute_program(user_text, character, noise, style_blend, diffusion_steps, embedding_scale, use_long_form,
+                            reference_audio, enable_reference_audio, timbre_ref_blend, prosody_ref_blend,
                             output_filename_sans_extension, gpu_id)
             copy_output(output_filename_sans_extension, session_id)
             hsc.clean_up(get_temp_files())
@@ -68,6 +74,7 @@ def register_methods(cache):
                     'type': 'object',
                     'properties': {
                         'User Text': {'type': 'string'},
+                        'User Audio': {'type': 'string'}
                     },
                     'required': ['User Text']
                 },
@@ -80,6 +87,9 @@ def register_methods(cache):
                         'Diffusion Steps': {'type': 'integer', 'minimum': 1},
                         'Embedding Scale': {'type': 'number'},
                         'Use Long Form': {'type': 'boolean'},
+                        'Enable Reference Audio': {'type': 'boolean'},
+                        'Timbre Reference Blend': {'type': 'number', 'minimum': 0, 'maximum': 1},
+                        'Prosody Reference Blend': {'type': 'number', 'minimum': 0, 'maximum': 1},
                     },
                     'required': ['Character', 'Noise', 'Style Blend', 'Diffusion Steps', 'Embedding Scale',
                                  'Use Long Form']
@@ -103,16 +113,35 @@ def register_methods(cache):
         diffusion_steps = request.json['Options']['Diffusion Steps']
         embedding_scale = request.json['Options']['Embedding Scale']
         use_long_form = request.json['Options']['Use Long Form']
+        input_hash = request.json['Inputs']['User Audio']
+        enable_reference_audio = request.json['Options']['Enable Reference Audio']
+        timbre_ref_blend = request.json['Options']['Timbre Reference Blend']
+        prosody_ref_blend = request.json['Options']['Prosody Reference Blend']
         output_filename_sans_extension = request.json['Output File']
         gpu_id = request.json['GPU ID']
         session_id = request.json['Session ID']
 
         return (user_text, character, noise, style_blend, diffusion_steps, embedding_scale, use_long_form,
+                input_hash, enable_reference_audio, timbre_ref_blend, prosody_ref_blend,
                 output_filename_sans_extension, gpu_id, session_id)
 
 
     class BadInputException(Exception):
         pass
+
+
+    def prepare_reference_audio(input_hash, enable_reference_audio, cache, session_id):
+        """Temporarily pull the reference file out of the cache and save it to a file."""
+        if not enable_reference_audio or input_hash is None:
+            return None
+        target = os.path.join(INPUT_COPY_FOLDER, input_hash + TEMP_FILE_EXTENSION)
+        try:
+            array, samplerate = cache.read_audio_from_cache(Stage.PREPROCESSED, session_id, input_hash)
+            soundfile.write(target, array, samplerate)
+        except Exception as e:
+            raise Exception("Unable to save reference audio to a temporary file.") \
+                from e
+        return target
 
     def get_config_file(character):
         character_dir = hsc.character_dir(ARCHITECTURE_NAME, character)
@@ -123,6 +152,7 @@ def register_methods(cache):
         return config_file
 
     def execute_program(user_text, character, noise, style_blend, diffusion_steps, embedding_scale, use_long_form,
+                        reference_audio, enable_reference_audio, timbre_ref_blend, prosody_ref_blend,
                         output_filename_sans_extension, gpu_id):
         character_dir = hsc.character_dir(ARCHITECTURE_NAME, character)
         config_file = get_config_file(character)
@@ -136,7 +166,11 @@ def register_methods(cache):
             *(['--style_blend', str(style_blend)] if style_blend is not None else [None, None]),
             *(['--diffusion_steps', str(diffusion_steps)] if diffusion_steps is not None else [None, None]),
             *(['--embedding_scale', str(embedding_scale)] if embedding_scale is not None else [None, None]),
+            *(['--embedding_scale', str(embedding_scale)] if embedding_scale is not None else [None, None]),
             *(['--use_long_form'] if use_long_form else [None]),
+            *(['--reference_audio', reference_audio] if not enable_reference_audio is not None else [None, None]),
+            *(['--timbre_ref_blend', str(timbre_ref_blend)] if timbre_ref_blend is not None else [None, None]),
+            *(['--prosody_ref_blend', str(prosody_ref_blend)] if prosody_ref_blend is not None else [None, None]),
         ]
         arguments = [argument for argument in arguments if argument]  # Removes all "None" objects in the list.
         env = hsc.select_hardware(gpu_id)
@@ -150,7 +184,8 @@ def register_methods(cache):
 
 
     def get_temp_files():
-        return [os.path.join(OUTPUT_COPY_FOLDER, file) for file in os.listdir(OUTPUT_COPY_FOLDER)]
+        return [os.path.join(OUTPUT_COPY_FOLDER, file) for file in os.listdir(OUTPUT_COPY_FOLDER)] + \
+               [os.path.join(INPUT_COPY_FOLDER, file) for file in os.listdir(INPUT_COPY_FOLDER)]
 
 
 def parse_arguments():

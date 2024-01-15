@@ -77,7 +77,8 @@ RUN git clone -b main --single-branch -q https://github.com/hydrusbeta/styletts_
     mv ~/hay_say/styletts_2_command_line/command_line_interface.py ~/hay_say/styletts_2/
 
 # Create directories that are used by the Hay Say interface code
-RUN mkdir -p ~/hay_say/styletts_2/output/
+RUN mkdir -p ~/hay_say/styletts_2/output/ && \
+    mkdir -p ~/hay_say/styletts_2/input/
 
 # Expose port 6578, the port that Hay Say uses for RVC.
 EXPOSE 6580
