@@ -28,6 +28,8 @@ WEIGHTS_FILE_EXTENSION = '.pth'
 CONFIG_FILE_EXTENSION = '.yml'
 CONFIG_FILE_EXTENSION_ALT = '.yaml'
 
+STYLE_FILE_EXTENSION = '.json'
+
 app = Flask(__name__)
 
 
@@ -151,11 +153,17 @@ def register_methods(cache):
             config_file = hsc.get_single_file_with_extension(character_dir, CONFIG_FILE_EXTENSION_ALT)
         return config_file
 
+    def get_style_file(character):
+        character_dir = hsc.character_dir(ARCHITECTURE_NAME, character)
+        style_file = hsc.get_files_with_extension(character_dir, STYLE_FILE_EXTENSION)
+        return style_file[0] if style_file else None
+
     def execute_program(user_text, character, noise, style_blend, diffusion_steps, embedding_scale, use_long_form,
                         reference_audio, enable_reference_audio, timbre_ref_blend, prosody_ref_blend,
                         output_filename_sans_extension, gpu_id):
         character_dir = hsc.character_dir(ARCHITECTURE_NAME, character)
         config_file = get_config_file(character)
+        style_file = get_style_file(character)
         arguments = [
             '--text', user_text,
             '--weights_file', hsc.get_single_file_with_extension(character_dir, WEIGHTS_FILE_EXTENSION),
@@ -169,6 +177,7 @@ def register_methods(cache):
             *(['--embedding_scale', str(embedding_scale)] if embedding_scale is not None else [None, None]),
             *(['--use_long_form'] if use_long_form else [None]),
             *(['--reference_audio', reference_audio] if enable_reference_audio else [None, None]),
+            *(['--reference_style', style_file] if style_file and not enable_reference_audio else [None, None]),
             *(['--timbre_ref_blend', str(timbre_ref_blend)] if timbre_ref_blend is not None else [None, None]),
             *(['--prosody_ref_blend', str(prosody_ref_blend)] if prosody_ref_blend is not None else [None, None]),
         ]
