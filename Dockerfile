@@ -46,11 +46,11 @@ RUN ~/hay_say/.venvs/styletts_2/bin/pip install \
     --extra-index-url https://download.pytorch.org/whl/cu118 \
     einops==0.7.0 \
     einops-exts==0.0.4 \
+    gruut==2.3.4 \
     librosa==0.10.1 \
     git+https://github.com/resemble-ai/monotonic_align.git@78b985be210a03d08bc3acc01c4df0442105366f \
     munch==4.0.0 \
     nltk==3.8.1 \
-    phonemizer==3.2.1 \
     PyYAML==6.0.1 \
     torch==2.1.2+cu118 \
     torchaudio==2.1.2+cu118 \

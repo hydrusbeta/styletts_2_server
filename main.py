@@ -168,7 +168,7 @@ def register_methods(cache):
             *(['--embedding_scale', str(embedding_scale)] if embedding_scale is not None else [None, None]),
             *(['--embedding_scale', str(embedding_scale)] if embedding_scale is not None else [None, None]),
             *(['--use_long_form'] if use_long_form else [None]),
-            *(['--reference_audio', reference_audio] if not enable_reference_audio is not None else [None, None]),
+            *(['--reference_audio', reference_audio] if enable_reference_audio else [None, None]),
             *(['--timbre_ref_blend', str(timbre_ref_blend)] if timbre_ref_blend is not None else [None, None]),
             *(['--prosody_ref_blend', str(prosody_ref_blend)] if prosody_ref_blend is not None else [None, None]),
         ]
