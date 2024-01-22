@@ -30,6 +30,10 @@ CONFIG_FILE_EXTENSION_ALT = '.yaml'
 
 STYLE_FILE_EXTENSION = '.json'
 
+PRECOMPUTED_STYLE = "Precomputed Style"
+USE_REFERENCE_AUDIO = "Use Reference Audio"
+DISABLE = "Disable"
+
 app = Flask(__name__)
 
 
@@ -40,13 +44,13 @@ def register_methods(cache):
         message = ""
         try:
             (user_text, character, noise, style_blend, diffusion_steps, embedding_scale, use_long_form,
-             input_hash, enable_reference_audio, timbre_ref_blend, prosody_ref_blend,
-             output_filename_sans_extension, gpu_id, session_id) = parse_inputs()
-            reference_audio = prepare_reference_audio(input_hash, enable_reference_audio, cache,
-                                                      session_id)
+             input_hash, reference_style_source, timbre_ref_blend, prosody_ref_blend, precomputed_style_character,
+                precomputed_style_trait, output_filename_sans_extension, gpu_id, session_id) = parse_inputs()
+            reference_audio = prepare_reference_audio(input_hash, reference_style_source, cache, session_id)
             execute_program(user_text, character, noise, style_blend, diffusion_steps, embedding_scale, use_long_form,
-                            reference_audio, enable_reference_audio, timbre_ref_blend, prosody_ref_blend,
-                            output_filename_sans_extension, gpu_id)
+                            reference_audio, reference_style_source, timbre_ref_blend, prosody_ref_blend,
+                            precomputed_style_character, precomputed_style_trait, output_filename_sans_extension,
+                            gpu_id)
             copy_output(output_filename_sans_extension, session_id)
             hsc.clean_up(get_temp_files())
         except BadInputException:
@@ -89,9 +93,11 @@ def register_methods(cache):
                         'Diffusion Steps': {'type': 'integer', 'minimum': 1},
                         'Embedding Scale': {'type': 'number'},
                         'Use Long Form': {'type': 'boolean'},
-                        'Enable Reference Audio': {'type': 'boolean'},
+                        'Reference Style Source': {'enum': [PRECOMPUTED_STYLE, USE_REFERENCE_AUDIO, DISABLE]},
                         'Timbre Reference Blend': {'type': 'number', 'minimum': 0, 'maximum': 1},
                         'Prosody Reference Blend': {'type': 'number', 'minimum': 0, 'maximum': 1},
+                        'Precomputed Style Character': {'type': 'string'},
+                        'Precomputed Style Trait': {'type': 'string'},
                     },
                     'required': ['Character', 'Noise', 'Style Blend', 'Diffusion Steps', 'Embedding Scale',
                                  'Use Long Form']
@@ -116,25 +122,27 @@ def register_methods(cache):
         embedding_scale = request.json['Options']['Embedding Scale']
         use_long_form = request.json['Options']['Use Long Form']
         input_hash = request.json['Inputs']['User Audio']
-        enable_reference_audio = request.json['Options']['Enable Reference Audio']
+        reference_style_source = request.json['Options']['Reference Style Source']
         timbre_ref_blend = request.json['Options']['Timbre Reference Blend']
         prosody_ref_blend = request.json['Options']['Prosody Reference Blend']
+        precomputed_style_character = request.json['Options']['Precomputed Style Character']
+        precomputed_style_trait = request.json['Options']['Precomputed Style Trait']
         output_filename_sans_extension = request.json['Output File']
         gpu_id = request.json['GPU ID']
         session_id = request.json['Session ID']
 
         return (user_text, character, noise, style_blend, diffusion_steps, embedding_scale, use_long_form,
-                input_hash, enable_reference_audio, timbre_ref_blend, prosody_ref_blend,
-                output_filename_sans_extension, gpu_id, session_id)
+                input_hash, reference_style_source, timbre_ref_blend, prosody_ref_blend, precomputed_style_character,
+                precomputed_style_trait, output_filename_sans_extension, gpu_id, session_id)
 
 
     class BadInputException(Exception):
         pass
 
 
-    def prepare_reference_audio(input_hash, enable_reference_audio, cache, session_id):
+    def prepare_reference_audio(input_hash, reference_style_source, cache, session_id):
         """Temporarily pull the reference file out of the cache and save it to a file."""
-        if not enable_reference_audio or input_hash is None:
+        if not reference_style_source or input_hash is None:
             return None
         target = os.path.join(INPUT_COPY_FOLDER, input_hash + TEMP_FILE_EXTENSION)
         try:
@@ -153,17 +161,15 @@ def register_methods(cache):
             config_file = hsc.get_single_file_with_extension(character_dir, CONFIG_FILE_EXTENSION_ALT)
         return config_file
 
-    def get_style_file(character):
-        character_dir = hsc.character_dir(ARCHITECTURE_NAME, character)
-        style_file = hsc.get_files_with_extension(character_dir, STYLE_FILE_EXTENSION)
-        return style_file[0] if style_file else None
+    def get_style_file():
+        return os.path.join(hsc.guarantee_directory(os.path.join(hsc.MODELS_DIR, 'styletts_2')), 'precomputed_styles.json')
 
     def execute_program(user_text, character, noise, style_blend, diffusion_steps, embedding_scale, use_long_form,
-                        reference_audio, enable_reference_audio, timbre_ref_blend, prosody_ref_blend,
-                        output_filename_sans_extension, gpu_id):
+                        reference_audio, reference_style_source, timbre_ref_blend, prosody_ref_blend,
+                        precomputed_style_character, precomputed_style_trait, output_filename_sans_extension, gpu_id):
         character_dir = hsc.character_dir(ARCHITECTURE_NAME, character)
         config_file = get_config_file(character)
-        style_file = get_style_file(character)
+        style_file = get_style_file()
         arguments = [
             '--text', user_text,
             '--weights_file', hsc.get_single_file_with_extension(character_dir, WEIGHTS_FILE_EXTENSION),
@@ -174,10 +180,14 @@ def register_methods(cache):
             *(['--style_blend', str(style_blend)] if style_blend is not None else [None, None]),
             *(['--diffusion_steps', str(diffusion_steps)] if diffusion_steps is not None else [None, None]),
             *(['--embedding_scale', str(embedding_scale)] if embedding_scale is not None else [None, None]),
-            *(['--embedding_scale', str(embedding_scale)] if embedding_scale is not None else [None, None]),
             *(['--use_long_form'] if use_long_form else [None]),
-            *(['--reference_audio', reference_audio] if enable_reference_audio else [None, None]),
-            *(['--reference_style', style_file] if style_file and not enable_reference_audio else [None, None]),
+
+            *(['--reference_audio', reference_audio] if reference_style_source == USE_REFERENCE_AUDIO else [None, None]),
+
+            *(['--reference_style_json', style_file] if reference_style_source == PRECOMPUTED_STYLE else [None, None]),
+            *(['--precomputed_style_character', precomputed_style_character] if reference_style_source == PRECOMPUTED_STYLE else [None, None]),
+            *(['--precomputed_style_trait', precomputed_style_trait] if reference_style_source == PRECOMPUTED_STYLE else [None, None]),
+
             *(['--timbre_ref_blend', str(timbre_ref_blend)] if timbre_ref_blend is not None else [None, None]),
             *(['--prosody_ref_blend', str(prosody_ref_blend)] if prosody_ref_blend is not None else [None, None]),
         ]
