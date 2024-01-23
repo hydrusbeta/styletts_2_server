@@ -30,7 +30,7 @@ CONFIG_FILE_EXTENSION_ALT = '.yaml'
 
 STYLE_FILE_EXTENSION = '.json'
 
-PRECOMPUTED_STYLE = "Precomputed Style"
+PRECOMPUTED_STYLE = "Use Precomputed Style"
 USE_REFERENCE_AUDIO = "Use Reference Audio"
 DISABLE = "Disable"
 
@@ -96,8 +96,8 @@ def register_methods(cache):
                         'Reference Style Source': {'enum': [PRECOMPUTED_STYLE, USE_REFERENCE_AUDIO, DISABLE]},
                         'Timbre Reference Blend': {'type': 'number', 'minimum': 0, 'maximum': 1},
                         'Prosody Reference Blend': {'type': 'number', 'minimum': 0, 'maximum': 1},
-                        'Precomputed Style Character': {'type': 'string'},
-                        'Precomputed Style Trait': {'type': 'string'},
+                        'Precomputed Style Character': {'type': ['string', 'null']},
+                        'Precomputed Style Trait': {'type': ['string', 'null']},
                     },
                     'required': ['Character', 'Noise', 'Style Blend', 'Diffusion Steps', 'Embedding Scale',
                                  'Use Long Form']
@@ -185,6 +185,7 @@ def register_methods(cache):
             *(['--reference_audio', reference_audio] if reference_style_source == USE_REFERENCE_AUDIO else [None, None]),
 
             *(['--reference_style_json', style_file] if reference_style_source == PRECOMPUTED_STYLE else [None, None]),
+            *(['--precomputed_style_model', character] if reference_style_source == PRECOMPUTED_STYLE else [None, None]),
             *(['--precomputed_style_character', precomputed_style_character] if reference_style_source == PRECOMPUTED_STYLE else [None, None]),
             *(['--precomputed_style_trait', precomputed_style_trait] if reference_style_source == PRECOMPUTED_STYLE else [None, None]),
 
