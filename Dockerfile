@@ -73,6 +73,9 @@ RUN git reset --hard 9b3dd4b910178088b1496a2f97d099f51c1058bb # Dec 16, 2023
 # Clone the Hay Say interface code
 RUN git clone -b main --single-branch -q https://github.com/hydrusbeta/styletts_2_server ~/hay_say/styletts_2_server
 
+# Move the pretrained models to the expected directories.
+RUN mv ~/hay_say/temp_downloads/Models ~/hay_say/styletts_2
+
 # Add command line functionality to StyleTTS2
 RUN git clone -b main --single-branch -q https://github.com/hydrusbeta/styletts_2_command_line ~/hay_say/styletts_2_command_line && \
     mv ~/hay_say/styletts_2_command_line/command_line_interface.py ~/hay_say/styletts_2/
@@ -83,9 +86,6 @@ RUN mkdir -p ~/hay_say/styletts_2/output/ && \
 
 # Expose port 6578, the port that Hay Say uses for RVC.
 EXPOSE 6580
-
-# Move the pretrained models to the expected directories.
-RUN mv ~/hay_say/temp_downloads/Models ~/hay_say/styletts_2
 
 # Execute the Hay Say interface code
 CMD ["/bin/sh", "-c", "~/hay_say/.venvs/styletts_2_server/bin/python ~/hay_say/styletts_2_server/main.py --cache_implementation file"]
