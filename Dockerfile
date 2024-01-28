@@ -44,6 +44,7 @@ RUN ~/hay_say/.venvs/styletts_2/bin/pip install \
     --timeout=300 \
     --no-cache-dir \
     --extra-index-url https://download.pytorch.org/whl/cu118 \
+    arpabetandipaconvertor==1.0.2 \
     einops==0.7.0 \
     einops-exts==0.0.4 \
     gruut==2.3.4 \

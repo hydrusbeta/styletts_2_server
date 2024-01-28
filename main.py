@@ -45,11 +45,11 @@ def register_methods(cache):
         try:
             (user_text, character, noise, style_blend, diffusion_steps, embedding_scale, use_long_form,
              input_hash, reference_style_source, timbre_ref_blend, prosody_ref_blend, precomputed_style_character,
-                precomputed_style_trait, output_filename_sans_extension, gpu_id, session_id) = parse_inputs()
+                precomputed_style_trait, speed, output_filename_sans_extension, gpu_id, session_id) = parse_inputs()
             reference_audio = prepare_reference_audio(input_hash, reference_style_source, cache, session_id)
             execute_program(user_text, character, noise, style_blend, diffusion_steps, embedding_scale, use_long_form,
                             reference_audio, reference_style_source, timbre_ref_blend, prosody_ref_blend,
-                            precomputed_style_character, precomputed_style_trait, output_filename_sans_extension,
+                            precomputed_style_character, precomputed_style_trait, speed, output_filename_sans_extension,
                             gpu_id)
             copy_output(output_filename_sans_extension, session_id)
             hsc.clean_up(get_temp_files())
@@ -98,6 +98,7 @@ def register_methods(cache):
                         'Prosody Reference Blend': {'type': 'number', 'minimum': 0, 'maximum': 1},
                         'Precomputed Style Character': {'type': ['string', 'null']},
                         'Precomputed Style Trait': {'type': ['string', 'null']},
+                        'Speed': {'type': 'number', 'minimum': 0.1, 'maximum': 5.0},
                     },
                     'required': ['Character', 'Noise', 'Style Blend', 'Diffusion Steps', 'Embedding Scale',
                                  'Use Long Form']
@@ -127,13 +128,14 @@ def register_methods(cache):
         prosody_ref_blend = request.json['Options']['Prosody Reference Blend']
         precomputed_style_character = request.json['Options']['Precomputed Style Character']
         precomputed_style_trait = request.json['Options']['Precomputed Style Trait']
+        speed = request.json['Options']['Speed']
         output_filename_sans_extension = request.json['Output File']
         gpu_id = request.json['GPU ID']
         session_id = request.json['Session ID']
 
         return (user_text, character, noise, style_blend, diffusion_steps, embedding_scale, use_long_form,
                 input_hash, reference_style_source, timbre_ref_blend, prosody_ref_blend, precomputed_style_character,
-                precomputed_style_trait, output_filename_sans_extension, gpu_id, session_id)
+                precomputed_style_trait, speed, output_filename_sans_extension, gpu_id, session_id)
 
 
     class BadInputException(Exception):
@@ -166,7 +168,8 @@ def register_methods(cache):
 
     def execute_program(user_text, character, noise, style_blend, diffusion_steps, embedding_scale, use_long_form,
                         reference_audio, reference_style_source, timbre_ref_blend, prosody_ref_blend,
-                        precomputed_style_character, precomputed_style_trait, output_filename_sans_extension, gpu_id):
+                        precomputed_style_character, precomputed_style_trait, speed, output_filename_sans_extension,
+                        gpu_id):
         character_dir = hsc.character_dir(ARCHITECTURE_NAME, character)
         config_file = get_config_file(character)
         style_file = get_style_file()
@@ -191,6 +194,8 @@ def register_methods(cache):
 
             *(['--timbre_ref_blend', str(timbre_ref_blend)] if timbre_ref_blend is not None else [None, None]),
             *(['--prosody_ref_blend', str(prosody_ref_blend)] if prosody_ref_blend is not None else [None, None]),
+
+            *(['--speed', str(speed)] if speed is not None else [None, None]),
         ]
         arguments = [argument for argument in arguments if argument]  # Removes all "None" objects in the list.
         env = hsc.select_hardware(gpu_id)
